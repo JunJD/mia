@@ -1,0 +1,321 @@
+---
+title: "源码级深入React的hooks--useState"
+description: "这篇文章主要是一起了解一下React的useState是如何工作的"
+date: "2024-08-22"
+tags: ["React", "hooks", "useState", "源码"]
+cover: "https://images.unsplash.com/photo-1580196969807-cc6de06c05be"
+---
+
+# 源码级深入React的hooks--useState
+
+在当今的前端开发中，组件化设计已成为一项基本原则，Vue和React两大流行框架都是这一理念的扛鼎之作。Vue开发者熟悉的是通过组件的方式封装和重用界面逻辑，React同样采用了组件化的思想，但在细节实现上有所不同。特别是React的hooks机制，解决了前端开发中逻辑复用的问题。
+
+！！！这篇文章主要是一起了解一下React的useState是如何工作的！！！
+
+了解vue的都知道，vue的响应式是通过**proxy**或者是**defineProperty** 来实现响应式的（下图是vue对于响应式原理部分的图解说明图）
+
+
+它能够使得用户界面自动地响应底层数据的变化。Vue.js 2.x版本主要通过`Object.defineProperty`来实现响应式系统。这个方法允许对一个对象的某个属性进行拦截，当该属性被访问或者修改时，可以自定义一些行为。Vue在内部对数据对象的所有属性递归地使用这个方法，从而能够监听到数据的变化，并在变化发生时通知视图进行更新。
+
+但是我们今天讨论的是 react是如何在不借助**proxy**或者是**defineProperty**来完成响应式更新的呢？
+
+## 这文章就带我们解开这个神秘的黑盒子---react是如何做响应式的
+
+### 0. 从一个简单的需求开始
+
+现在我们实现一个简单的页面：页面有一个按钮，按钮右侧有一个展示区，默认是展示数字`0`；点击按钮这个数组就增加`1`
+
+### **1. 普通的变量能否作为状态？**
+
+先看代码
+
+```jsx
+function Addition() {
+  let index = 0;
+
+  function handleClick() {
+    index = index + 1;
+  }
+
+  return (
+    <div>
+      <button onClick={handleClick}>
+        Add
+      </button>
+      <h3>
+        ({index + 1}
+      </h3>
+    </div>
+  );
+}
+```
+
+点击 “Add” 按钮应该将 `index` 更改为 `1`，页面并显示为`1`，再次点击又更改为`2`
+
+但这个组件现在是**不起作用的**
+
+`handleClick()` 事件处理函数正在更新局部变量 `index`。但存在两个原因使得变化不可见：
+
+1. **局部变量无法在多次渲染中持久保存。** 当 React 再次渲染这个组件时，它会从头开始渲染——不会考虑之前对局部变量的任何更改。
+2. **更改局部变量不会触发渲染。** React 没有意识到它需要使用新数据再次渲染组件。
+
+要使用新数据更新组件，需要做两件事：
+
+1. **保留** 渲染之间的数据。
+2. **触发** React 使用新数据渲染组件（重新渲染）。
+
+### 2. 使用 useState维护状态
+
+1. **State 变量** 用于保存渲染间的数据。
+2. **State setter 函数** 更新变量并触发 React 再次渲染组件。
+
+接下来我们将代码改成以下这样
+
+```jsx
+function Addition() {
+  const [index, setIndex] = useState(0);
+
+  function handleClick() {
+    setIndex(index + 1);
+  }
+
+  return (
+    <div>
+      <button onClick={handleClick}>
+        Add
+      </button>
+      <h3>
+        ({index + 1}
+      </h3>
+    </div>
+  );
+}
+```
+
+现在点击 “Add” 按钮就可以完成我们的需求了！
+
+### 3. 解析useState
+
+当调用 `useState` 时，你是在告诉 React 你想让这个组件记住一些东西：
+
+```jsx
+const [index, setIndex] = useState(0);
+```
+
+在这个例子里，你希望 React 记住 `index`。
+
+> 惯例是将这对返回值命名为 const [thing, setThing]。你也可以将其命名为任何你喜欢的名称，但遵照约定俗成能使跨项目合作更易理解
+> 
+
+`useState` 的唯一参数是 state 变量的**初始值**。在这个例子中，`index` 的初始值被`useState(0)`设置为 `0`。
+
+每次你的组件渲染时，`useState` 都会给你一个包含两个值的数组：
+
+1. **state 变量** (`index`) 会保存上次渲染的值。
+2. **state setter 函数** (`setIndex`) 可以更新 state 变量并触发 React 重新渲染组件。
+
+以下是实际发生的情况：
+
+1. **组件进行第一次渲染。** 因为你将 `0` 作为 `index` 的初始值传递给 `useState`，它将返回 `[0, setIndex]`。 React 记住 `0` 是最新的 state 值。
+2. **你更新了 state**。当用户点击按钮时，它会调用 `setIndex(index + 1)`。 `index` 是 `0`，所以它是 `setIndex(1)`。这告诉 React 现在记住 `index` 是 `1` 并触发下一次渲染。
+3. **组件进行第二次渲染**。React 仍然看到 `useState(0)`，但是因为 React *记住* 了你将 `index` 设置为了 `1`，它将返回 `[1, setIndex]`。
+4. 以此类推！
+
+### 4. **扩展功能：增加显示名字的按钮**
+
+现在，我们希望能够增加一个按钮用于展示我们的名字
+
+我们可以这样写
+
+```jsx
+function Addition() {
+  const [index, setIndex] = useState(0);
+  const [show, setShowName] = useState(false);
+
+  function handleClick() {
+    setIndex(index + 1);
+  }
+  function handleShowClick() {
+    setShowName(!show);
+  }
+
+  return (
+    <div>
+      <button onClick={handleClick}>
+        Add
+      </button>
+      <h3>
+        ({index + 1}
+      </h3>
+
+     <button onClick={handleShowClick}>
+        Show Name
+      </button>
+      { show && <h3>
+        vivo
+      </h3>}
+    </div>
+  );
+}
+```
+
+一个组件中拥有任意多种类型的 state 变量。该组件有两个 state 变量，一个数字 `index` 和一个布尔值 `show`，点击 “ Show Name” 会改变 `show` 的值
+
+那么问题来了： **React 如何知道返回哪个 state？**
+
+### 5. 源码深入-**单组件中多个state的关系**
+
+`useState` 在调用时没有任何关于它引用的是*哪个* state 变量的信息。没有传递给 `useState` 的“标识符”，它是如何知道要返回哪个 state 变量呢？
+
+在React的世界里，组件的状态管理是通过一个精妙的机制实现的。每当我们在组件中调用useState，React实际上在幕后进行了一系列复杂的操作来确保状态的正确管理和更新。这一切的核心在于React的Fiber架构，以及如何在组件的FiberNode上维护状态。
+
+首先，React为每个组件分配了一个称为FiberNode的内部对象。这个对象不仅包含了组件的各种信息和状态，而且还充当了一个容器，存储了组件所有useState调用的状态。具体来说，每个useState调用的状态都被表示为一个链表中的节点（Hook），并且这个链表被挂载到FiberNode的memorizedState属性上。
+
+**当组件首次渲染（mount）时**
+
+React会初始化这个链表。每次调用useState，都会创建一个新的Hook节点，这个节点包含了状态的当前值以及一个更新队列。对于第一个useState调用，创建的Hook节点会直接挂载到FiberNode的memorizedState上，成为链表的头节点。对于后续的useState调用，每创建一个新的Hook节点，就会将其链接到上一个Hook节点的next属性上，形成一个完整的链表结构。
+
+**直接看代码**
+
+```tsx
+
+// 正在处理的FiberNode
+let currentlyRenderingFiber: FiberNode | null = null;
+
+// 正在处理的hooks
+let workInProgressUseState: Hook | null = null;
+
+function mountWorkInProgressHook(): Hook {
+    const hook: Hook = {
+        memorizedState: null,
+        updateQueue: null,
+        next: null,
+    };
+    if (workInProgressUseState=== null) {
+        // 第一个useState
+        workInProgressUseState= hook;
+        currentlyRenderingFiber.memorizedState = workInProgressHook;
+    } else {
+        // 后续的useState
+        workInProgressHook.next = hook;
+        workInProgressUseState= hook;
+    }
+    return workInProgressHook;
+}
+
+```
+
+1. `currentlyRenderingFiber`
+
+`currentlyRenderingFiber` 这是React用于记录当前正在处理的函数组件对应的`FiberNode` 节点
+
+`currentlyRenderingFiber`中的`memorizedState` 用于记录该组件所有hook，就是前文说的链表结构
+
+1. `workInProgressUseState`
+
+`workInProgressUseState`中的`updateQueue` 是更新队列 是为了实现多次setState能够批处理以及支持并发调度(可以暂时不用关注)
+
+`workInProgressUseState`中的`memorizedState` 是前文说的保存上次渲染的值
+
+每当`React` 重新渲染，每个函数式组件都会被调用。函数组件中的useState本质是函数，所以也会被调用。`useState` 每被调用一次时，都会执行一次`mountWorkInProgressHook` 。
+
+加载第一个`useState` 时, `mountWorkInProgressHook` 为null, 所以就会将空`Hook` 赋值给它,并将 `currentlyRenderingFiber` 的`memorizedState` 指向它, 作为链表的头部节点。在后续的加载中，将下一个`Hook`挂载到上一个的`next`节点上，行程链表。
+
+这样一个保存中`currentlyRenderingFiber` 中就存储了一个维护状态的链表了，并且是有序的.
+
+上述代码只是用于组装链表的执行函数，对于链表每个节点的`memorizedState` 和`updateQueue` 的处理都是在`mountState` 中处理的。
+
+我们使用的`useState` ，其实它是引用了两个函数，初始化时引用`mountState` ，初始化之后就引用了`updateState`我们先讨论mountState
+
+`mountWorkInProgressHook` 函数返回的`Hook` 中的`memorizedState` 就是在这里被赋值的
+
+```tsx
+function mountState<State>(
+    initialState: State | (() => State)
+): [State, Dispatch<State>] {
+    // 找到当前useState对应的hook数据
+    const hook = mountWorkInProgressHook();
+    let memorizedState;
+    if (initialState instanceof Function) {
+        memorizedState = initialState();
+    } else {
+        memorizedState = initialState;
+    }
+
+    hook.memorizedState = memorizedState;
+    // dispatch逻辑      todo
+    return [memorizedState, dispatch];
+}
+```
+
+至此，基本能解释**单组件中多个state的关系**了
+
+它们是链表中的一个个节点 。这个链表是在第一次渲染，也就是第一次调用`useState` (`mountState` )时生成的，并绑定到该函数组件中映射的FiberNode节点的`memorizedState` 属性上
+
+等到使用的时候，我们就解决了`**React 如何知道返回哪个 state**`的问题
+
+到这儿我们基本解释了为什么同一个组件中，usestate互不影响。那么不同的组件中，useState又是怎么做到隔离的呢？
+
+### **6. 不同组件中useState互不影响**
+
+React确保不同组件中使用的`useState`互不影响的机制基于其Fiber架构。每个React组件都对应一个Fiber节点，该节点包含了组件的状态、副作用列表等信息。当我们在不同的函数组件中调用`useState`时，实际上这些状态被存储在各自对应的Fiber节点中。
+
+React通过`currentlyRenderingFiber`变量跟踪当前正在渲染的组件的Fiber节点。因此，当在组件中调用`useState`时，React知道这个状态属于哪个Fiber节点（即哪个组件）。这样就实现了组件间状态隔离，确保了一个组件内部的状态更新不会影响到其他组件。
+
+此外，React在处理组件的更新时也是基于Fiber节点进行的。这意味着更新会被局限在相应的组件树中，不会泄露到其他组件。因此，不同组件中的`useState`调用互不影响，每个组件管理自己的状态。
+
+继续我们的探索，让我们深入理解`useState`中的`dispatch`函数是如何触发组件的重新渲染的。
+
+### **7. `dispatch`如何工作**
+
+当你调用`setIndex`或者`setShowName`（这些都是`useState`提供的setter函数）时，实际上是在执行一个`dispatch`操作。这个`dispatch`操作是如何触发React去重新渲染组件的呢？我们来一探究竟。
+
+在React的`useState`实现中，每个state更新都是通过一个叫做`dispatchAction`的内部函数来处理的。这个函数负责将一个更新（update）加入到当前组件的更新队列中，并且通知React的调度器（scheduler）开始工作，准备重新渲染组件。
+
+```tsx
+
+function dispatchAction<State>(
+    hook: Hook,
+    queue: UpdateQueue<State>,
+    action: Action<State>
+) {
+    // 创建一个更新对象，并将其加入到更新队列中
+    const update = {
+        action,
+        next: null,
+    };
+
+    // 环状链表操作，将更新加入队列
+    if (queue.last === null) {
+        update.next = update;
+    } else {
+        update.next = queue.last.next;
+        queue.last.next = update;
+    }
+    queue.last = update;
+
+    // 调度更新操作
+    scheduleWork();
+}
+
+```
+
+### **调度和重新渲染**
+
+`scheduleWork`函数负责调度更新。它会告诉React需要对当前组件进行重新渲染。React的调度器（Scheduler）会根据优先级决定何时执行这个更新。一旦开始更新过程，React会遍历更新队列，并应用所有的更新到state上。更新完成后，会触发组件的重新渲染流程。
+
+在重新渲染过程中，React会再次调用组件函数。由于state已经更新，`useState`调用会返回最新的state值。因此，组件会用最新的state来渲染UI，从而反映出状态的变化。
+
+### **为什么这个机制高效**
+
+1. **批处理和异步更新**：React通过将多个state更新聚合到一个更新队列中，并异步执行这些更新，可以显著提高性能。这避免了不必要的重渲染和计算。
+2. **优先级调度**：React的调度器可以根据不同更新的优先级安排它们的执行顺序。这意味着对于紧急更新，React可以更快地响应，而对于不那么紧急的更新，则可以推迟执行，以避免阻塞重要的工作。
+3. **状态一致性**：通过在每个渲染周期内保持状态更新的顺序，React确保了组件状态的一致性，无论更新是同步还是异步发生的。
+
+通过这种机制，React的`useState`钩子不仅提供了一种简洁的方式来管理组件状态，还确保了应用的高效和响应性。这是React框架设计中的一个亮点，展示了在易用性和性能之间取得平衡的智慧。
+
+至此，我们已经深入探讨了React的`useState`钩子，从基本的状态管理到复杂的内部实现机制。通过对`useState`的深入理解，我们不仅可以更高效地使用React进行开发，还可以更好地理解React背后的设计哲学。
+
+`useState`钩子是React函数组件中状态管理的基石。它的设计允许开发者以一种直观和简洁的方式管理组件内部的状态，同时保证了组件渲染的响应性和高效性。通过`useState`的使用，我们可以轻松实现组件状态的更新和读取，让组件根据状态的变化重新渲染，展示最新的界面。
+
+深入源码层面，我们了解到React是如何通过Fiber架构和链表结构来维护和更新组件状态的。这种内部机制的设计，不仅保证了状态更新的高效和一致性，还允许了复杂的功能实现，如状态更新的异步调度和批处理。这些都体现了React框架的高效性和灵活性。

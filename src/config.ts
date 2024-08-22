@@ -1,32 +1,27 @@
-export const SITE_FAVICON = "/favicon.png";
-export const SITE_LOGO = "/avatar.png";
-export const SITE_TITLE = "Mia";
+export const SITE_FAVICON = "/avatar.jpg";
+export const SITE_LOGO = "/avatar.jpg";
+export const SITE_TITLE = "JunJie";
 export const SITE_DESCRIPTION =
-  "Mia is designed to be minimalist yet powerful, integrating the capabilities of Astro, MDX, and Rough Notation. Whether you're a developer, writer, or just someone who loves clean and efficient design, this theme is perfect for you.";
+  "这是我的个人博客，记录一些学习笔记和心得体会。";
 
 export const MENUS = [
   {
-    title: "Posts",
+    title: "学习笔记",
     link: "/posts",
     target: "_self",
   },
   {
-    title: "Tags",
+    title: "标签分类",
     link: "/tags",
     target: "_self",
   },
   {
-    title: "Archive",
+    title: "存档记录",
     link: "/date",
     target: "_self",
   },
-  {
-    title: "GitHub",
-    link: "https://github.com/infinity-ooo/astro-theme-mia",
-    target: "_blank",
-  },
 ];
 
-export const FOOTER_CONTENT = "Let's build a 1B unicorn 🦄";
+export const FOOTER_CONTENT = "谢谢你来 🦄";
 
 export const GOOGLE_GTAG = "G-XXXXXXXXXX";
