@@ -39,7 +39,7 @@ function Counter() {
 
 **hook链表示意图**
 
-![image.png](React%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86%EF%BC%9A%E4%BB%8EHook%E5%88%B0%E6%B8%B2%E6%9F%93%20b081fe2a314047c4ae4342b8ad1c3c17/image.png)
+![image.png](https://7km.top/static/fiber-hook.78f3cde0.png)
 
 首先，React需要一种方式来保存组件的多个状态。它使用了一个精心设计的链表结构：
 
@@ -126,7 +126,7 @@ function dispatchSetState<State>(
 
 **更新链式队列示意图**
 
-![image.png](React%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86%EF%BC%9A%E4%BB%8EHook%E5%88%B0%E6%B8%B2%E6%9F%93%20b081fe2a314047c4ae4342b8ad1c3c17/image%201.png)
+![image.png](https://7km.top/static/updatequeue.b3653f69.png)
 
 当React开始处理这些更新时（注意useState的触发时机是FC组件重新被调用，下文提到的 renderWithHooks 会描述调用FC的过程）：
 
