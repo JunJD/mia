@@ -434,4 +434,83 @@ graph LR
 这个详细的流程解释了 Agent 如何基于历史记录、通过 LLM 的智能决策，并利用预定义的工具来生成具体的行动指令，从而驱动任务的进展。
 
 ## 7. AgentController 与 Agent 的交互
-	
+
+`AgentController` (在 OpenHands 中具体实现为 `openhands.controller.agent_controller.AgentController`) 是整个 Agent 系统运行的"指挥中心"。它负责管理 `Agent` 的生命周期、维护核心状态 (`State`)、协调与 `EventStream` 和 `Runtime` (执行环境) 的交互，并驱动 Agent 的核心"思考-行动"循环。
+
+以下是 `AgentController` 与 `Agent` 交互的关键方面和流程：
+
+**核心职责：**
+
+1.  **初始化与设置**:
+    *   在创建时，`AgentController` 接收一个 `Agent` 实例 (如 `CodeActAgent`)、一个 `EventStream` 实例、最大迭代次数等配置。
+    *   它会初始化一个 `State` 对象。如果提供了先前的状态 (例如，用于会话恢复)，则加载该状态；否则，创建一个新的 `State`。
+    *   一个关键步骤是调用内部的 `_init_history()` 方法，该方法从 `EventStream` 中读取历史事件，并用它们填充 `State.history` 列表。这确保了即使是新创建的 `State` 对象也能拥有完整的历史上下文。
+    *   `AgentController` 会向 `EventStream` 发布一个初始的 `SystemMessageAction` (通过 `_add_system_message()`)，其中包含了 Agent 的角色定义和高级指令。`Agent` 在其 `step()` 方法中会处理这个系统消息以配置其行为。
+    *   除非自身是代理控制器（delegate），否则 `AgentController` 会订阅 `EventStream` 的事件，通过其 `on_event` (内部为 `_on_event`) 回调方法接收新的 `Event`。
+
+2.  **事件驱动的控制流**:
+    *   `AgentController` 的主要运作模式是事件驱动的，而非一个持续轮询的循环。
+    *   当 `EventStream` 中有新的 `Event` (例如用户输入 `MessageAction`，或 `Runtime` 执行完命令后的 `Observation`) 发布时，`AgentController` 的 `on_event` 方法会被调用。
+    *   在 `_on_event` 方法内部，控制器会调用 `should_step(event)` 来判断当前事件是否应该触发 Agent 进行下一步思考。例如，用户的消息或一个非空的 `Observation` 通常会触发 `step`。
+
+3.  **驱动 Agent 执行 (`_step` 方法)**:
+    *   如果 `should_step()` 返回 `True`，并且没有其他阻塞条件 (如 Agent 状态不是 `RUNNING`、有待处理的 `Action`、达到最大迭代次数等)，`AgentController` 就会执行 `_step()` 方法。
+    *   在调用 `Agent` 之前，它会更新状态，例如增加 `state.iteration` 计数。
+    *   **核心交互点**: `action = await self.agent.step(self.state)`。这里，当前的 `State` 对象被传递给 `Agent` (例如 `CodeActAgent`)。`Agent` 内部会进行历史精简、构建 Prompt、调用 LLM、解析响应，并返回一个具体的 `Action` 对象。
+    *   获取到 `Agent` 返回的 `Action`后，`AgentController` 通过 `self.event_stream.add_event(action, EventSource.AGENT)` 将此 `Action` 发布回 `EventStream`。
+    *   之后可能会更新一些状态，如 `state.local_metrics`。
+
+4.  **Action 的执行与 Observation 的接收**:
+    *   当 `AgentController` 将 `Agent` 生成的 `Action` 发布到 `EventStream` 后：
+        *   `Runtime` (或其他订阅了相应 `Action` 类型的模块) 会从 `EventStream` 接收到这个 `Action`。
+        *   `Runtime` 负责在相应的环境 (如沙箱) 中执行该 `Action` (例如，运行一个 shell 命令)。
+        *   执行完毕后，`Runtime` 会将执行结果封装成一个 `Observation` (例如 `CmdOutputObservation`)，并将其发布回 `EventStream`。
+    *   `AgentController` (作为 `EventStream` 的订阅者) 会通过其 `on_event` 方法接收到这个新的 `Observation`。
+    *   如果这个 `Observation` 满足 `should_step()` 的条件，那么 `AgentController` 又会调用 `_step()`，从而使 `Agent` 基于新的观察结果进行下一轮思考和决策，形成闭环。
+
+5.  **状态管理与持久化**:
+    *   `AgentController` 持有并管理 `State` 对象的运行时实例。
+    *   `State` 对象本身负责其内容的序列化 (pickle) 和反序列化逻辑。`AgentController` 在初始化时确保从持久化存储 (通过 `EventStream` 间接) 加载历史。
+    *   在控制器关闭 (`close()` 方法被调用) 时，它会确保 `state.history` 被 `EventStream` 中的完整事件序列填充。这一点很重要，因为在运行期间，`State.history` 可能只包含部分或经过筛选的事件视图，而 `EventStream` 中的文件才是所有事件的权威记录。
+
+6.  **处理 Agent 的特殊输出**:
+    *   **`AgentFinishAction`**: 如果 `Agent` 决定任务已完成并返回 `AgentFinishAction`，`AgentController` 会相应地更新其内部状态至 `AgentState.FINISHED` (通过 `set_agent_state_to()`)，这通常会停止 дальнейшие шаги.
+    *   **`AgentDelegateAction`**: OpenHands 支持多 Agent 协作。如果 `Agent` 返回 `AgentDelegateAction`，当前的 `AgentController` 会启动一个新的（代理）`AgentController` 和 `Agent` 实例来处理子任务。
+    *   **需要用户确认的 Action**: 如果 `confirmation_mode` 开启，并且 `Agent` 返回了一个需要确认的 `Action`，`AgentController` 会将状态设置为 `AgentState.AWAITING_USER_INPUT`，等待用户通过某种方式（如前端界面）提供确认或拒绝，然后将用户的响应作为新的 `Event` 注入 `EventStream`。
+
+7.  **错误处理与迭代限制**:
+    *   `AgentController` 监控迭代次数是否超过 `state.max_iterations`。如果超过，它可能会根据配置暂停 Agent 或提示用户。
+    *   如果 `Agent` 或 `Runtime` 在执行过程中遇到错误，通常会产生 `ErrorObservation`。`AgentController` 接收到这个 `Observation` 后，可能会将 Agent 状态设置为 `AgentState.ERROR` 并记录错误信息。
+
+**简化流程图表示:**
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant EventStream as ES
+    participant AgentController as AC
+    participant Agent
+    participant Runtime
+
+    User->>ES: 输入 (MessageAction)
+    ES->>AC: on_event(MessageAction)
+    AC->>AC: should_step()? (True)
+    AC->>AC: _step()
+    AC->>Agent: step(State)
+    Agent-->>AC: 返回 Action
+    AC->>ES: add_event(Action)
+
+    ES->>Runtime: Action (若为可执行类型)
+    Runtime->>Runtime: 执行 Action
+    Runtime->>ES: add_event(Observation)
+
+    ES->>AC: on_event(Observation)
+    AC->>AC: should_step()? (True)
+    AC->>AC: _step()
+    AC->>Agent: step(State) // Agent 基于新 Observation 思考
+    Agent-->>AC: 返回 Action
+    AC->>ES: add_event(Action)
+    Note right of AC: 循环继续...
+```
+
+通过这种方式，`AgentController` 精心编排了 `Agent` 的思考、`Action` 的执行以及 `Observation` 的反馈，有效地驱动了整个智能任务的逐步完成。
