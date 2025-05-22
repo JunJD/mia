@@ -21,3 +21,126 @@ pre.astro-code {
 svg.rough-annotation {
   opacity: 70%;
 }
+
+/* Comment Section Styles */
+.comment-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0; /* Softer border color */
+  border-radius: 8px;
+  background-color: #f8fafc; /* Slightly off-white background */
+}
+
+.comment-section h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem; /* Increased bottom margin for spacing */
+  color: #1a202c; /* Darker heading color */
+  font-size: 1.25rem; /* Slightly larger heading */
+}
+
+.comment-section form div {
+  margin-bottom: 1rem;
+}
+
+.comment-section label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600; /* Semi-bold labels */
+  color: #4a5568; /* Medium-dark label color */
+}
+
+.comment-section input[type="text"],
+.comment-section textarea {
+  width: 100%;
+  padding: 0.75rem 1rem; /* Adjusted padding */
+  border: 1px solid #cbd5e0; /* Medium border color */
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 1rem;
+  color: #2d3748; /* Darker input text color */
+}
+
+.comment-section input[type="text"]:focus,
+.comment-section textarea:focus {
+  border-color: #4299e1; /* Blue border on focus */
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2); /* Subtle focus shadow */
+}
+
+.comment-section textarea {
+  resize: vertical;
+  min-height: 80px; /* Minimum height for textarea */
+}
+
+.comment-section button[type="submit"] {
+  background-color: #3182ce; /* Tailwind blue.600 */
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500; /* Medium button text */
+  transition: background-color 0.2s ease-in-out;
+}
+
+.comment-section button[type="submit"]:hover {
+  background-color: #2b6cb0; /* Tailwind blue.700 */
+}
+
+.comment-section .error-message {
+  color: #e53e3e; /* Tailwind red.600 */
+  font-weight: bold;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #fed7d7; /* Tailwind red.200 */
+  border: 1px solid #f56565; /* Tailwind red.400 */
+  border-radius: 4px;
+}
+
+.comment-section ul {
+  list-style-type: none;
+  padding: 0;
+  margin-top: 1.5rem; /* Space above comments list */
+}
+
+.comment-section li {
+  padding: 1rem;
+  border: 1px solid #e2e8f0; /* Separator for comments */
+  background-color: #fff; /* White background for comments */
+  margin-bottom: 1rem; /* Space between comments */
+  border-radius: 6px; /* Rounded corners for comments */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Subtle shadow */
+}
+
+.comment-section li:last-child {
+  border-bottom: 1px solid #e2e8f0; /* Ensure last comment also has a border if preferred, or remove if not needed */
+}
+
+.comment-section .comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.comment-section .comment-header strong {
+  color: #2d3748; /* Darker author name */
+  font-weight: 600;
+}
+
+.comment-section .comment-timestamp {
+  font-size: 0.8rem; /* Smaller timestamp */
+  color: #718096; /* Grayish color for timestamp */
+}
+
+.comment-section .comment-text {
+  color: #4a5568; /* Medium-dark text for comment content */
+  line-height: 1.6; /* Improved readability */
+  margin-top: 0.25rem; /* Space below header */
+}
+
+/* Message for no comments */
+.comment-section p { /* General paragraph styling within comment-section, if needed */
+  color: #4a5568;
+}
