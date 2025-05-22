@@ -1,15 +1,15 @@
 ---
 // src/components/CommentSection.astro
-// The Comment interface is globally available from src/types/env.d.ts
-let comments: Comment[] = [];
+// The BlogPostComment interface is globally available from src/types/env.d.ts
+let comments: BlogPostComment[] = [];
 let errorMessage = '';
 
 try {
   const response = await fetch('/comments.json');
   if (response.ok) {
-    // Assume the json is an array of Comment objects.
+    // Assume the json is an array of BlogPostComment objects.
     // Add type assertion for stronger type checking.
-    const data = await response.json() as Comment[]; 
+    const data = await response.json() as BlogPostComment[]; 
     if (Array.isArray(data)) {
       // Further check if elements are actual comments if necessary, for now, trust the source or structure.
       // A more robust check might involve validating each object in the array.
@@ -17,7 +17,7 @@ try {
     } else {
       console.error("Error: comments.json is not an array or is malformed.");
       errorMessage = 'Error loading comments. Data format incorrect.';
-      comments = []; // Ensure comments is Comment[]
+      comments = []; // Ensure comments is BlogPostComment[]
     }
   } else {
     if (response.status === 404) {
@@ -26,13 +26,13 @@ try {
     } else {
       console.error(`Error fetching comments: ${response.status} ${response.statusText}`);
       errorMessage = 'Error loading comments.';
-      comments = []; // Ensure comments is Comment[]
+      comments = []; // Ensure comments is BlogPostComment[]
     }
   }
 } catch (error) {
   console.error('Failed to fetch or parse comments.json:', error);
   errorMessage = 'Could not load comments at this time.';
-  comments = []; // Ensure comments is Comment[] in case of any error
+  comments = []; // Ensure comments is BlogPostComment[] in case of any error
 }
 ---
 
@@ -56,7 +56,7 @@ try {
     <p>No comments yet.</p>
   ) : (
     <ul>
-      {comments.map((comment: Comment) => ( // Explicitly type comment in map for clarity
+      {comments.map((comment: BlogPostComment) => ( // Explicitly type comment in map for clarity
         <li>
           <div class="comment-header">
             <strong>{comment.author}</strong>

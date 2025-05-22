@@ -34,24 +34,24 @@ if (Astro.request.method === "POST") {
       throw new Error("Name and comment fields are required.");
     }
 
-    const newComment: Comment = { // Explicitly type newComment
+    const newComment: BlogPostComment = { // Explicitly type newComment
       author: name,
       text: commentText,
       timestamp: new Date().toLocaleString('sv-SE'), // YYYY-MM-DD HH:mm:ss format
     };
 
     const commentsFilePath = path.join(process.cwd(), 'public', 'comments.json');
-    let comments: Comment[] = []; // Explicitly type comments array
+    let comments: BlogPostComment[] = []; // Explicitly type comments array
     try {
       const fileContent = await fs.readFile(commentsFilePath, 'utf-8');
       // Parse and assert type. For robustness, consider validation logic here.
       const parsedData = JSON.parse(fileContent); 
       if (Array.isArray(parsedData)) {
-        // A further check could be to validate each item in parsedData conforms to Comment interface
-        comments = parsedData as Comment[];
+        // A further check could be to validate each item in parsedData conforms to BlogPostComment interface
+        comments = parsedData as BlogPostComment[];
       } else {
         console.error("Warning: comments.json did not contain an array. Initializing with new comment.");
-        comments = []; // Ensure it's Comment[]
+        comments = []; // Ensure it's BlogPostComment[]
       }
     } catch (readError: any) {
       if (readError.code === 'ENOENT') {
@@ -65,7 +65,7 @@ if (Astro.request.method === "POST") {
       }
     }
 
-    comments.push(newComment); // newComment is already typed as Comment
+    comments.push(newComment); // newComment is already typed as BlogPostComment
     await fs.writeFile(commentsFilePath, JSON.stringify(comments, null, 2), 'utf-8');
 
     // It's important to redirect to prevent form resubmission on refresh
