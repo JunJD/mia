@@ -27,16 +27,20 @@ const { post } = Astro.props;
 if (Astro.request.method === "POST") {
   try {
     const formData = await Astro.request.formData();
-    const name = formData.get("name")?.toString();
-    const commentText = formData.get("comment")?.toString();
+    const name = formData.get("name")?.toString(); // Already "name"
+    const comment = formData.get("comment")?.toString(); // Changed from commentText
 
-    if (!name || !commentText) {
-      throw new Error("Name and comment fields are required.");
+    if (!name || !comment) { // Updated variable name here
+      //throw new Error("Name and comment fields are required."); // Old error throwing
+      return new Response(JSON.stringify({ success: false, message: "Name and comment fields are required." }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     const newComment: BlogPostComment = { // Explicitly type newComment
-      author: name,
-      text: commentText,
+      name: name,         // Changed from author to name
+      comment: comment,   // Changed from text to comment
       timestamp: new Date().toLocaleString('sv-SE'), // YYYY-MM-DD HH:mm:ss format
     };
 
@@ -68,14 +72,21 @@ if (Astro.request.method === "POST") {
     comments.push(newComment); // newComment is already typed as BlogPostComment
     await fs.writeFile(commentsFilePath, JSON.stringify(comments, null, 2), 'utf-8');
 
-    // It's important to redirect to prevent form resubmission on refresh
+    // It's important to redirect to prevent form resubmission on refresh -- no longer redirecting
     // Astro.url.pathname will give the current page's path
-    return Astro.redirect(Astro.url.pathname, 303); // 303 See Other for POST-redirect-GET pattern
+    // return Astro.redirect(Astro.url.pathname, 303); // 303 See Other for POST-redirect-GET pattern - REMOVED
+    return new Response(JSON.stringify({ success: true, message: "Comment submitted successfully.", comment: newComment }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error: any) {
     console.error("Error processing comment submission:", error);
-    // Optionally, render the page with an error message instead of just logging
-    // For now, let's just proceed to render the page, error will be in logs
-    // To pass error to the page: Astro.locals.error = error.message; (and handle in template)
+    // Optionally, render the page with an error message instead of just logging - Now returning JSON
+    // To pass error to the page: Astro.locals.error = error.message; (and handle in template) - Not applicable for API style response
+    return new Response(JSON.stringify({ success: false, message: error.message || "Internal server error processing comment." }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
 ---

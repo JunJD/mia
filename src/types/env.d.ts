@@ -2,7 +2,7 @@
 /// <reference types="astro/client" />
 
 interface BlogPostComment {
-  author: string;
-  text: string;
+  name: string;    // Changed from author
+  comment: string; // Changed from text
   timestamp: string; // ISO string or other date string format
 }

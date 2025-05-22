@@ -38,7 +38,7 @@ try {
 
 <div class="comment-section">
   <h3>Leave a Comment</h3>
-  <form method="POST">
+  <form method="POST" id="comment-form">
     <div>
       <label for="name">Name:</label>
       <input type="text" id="name" name="name" required />
@@ -52,24 +52,138 @@ try {
 
   <h3>Comments</h3>
   {errorMessage && <p class="error-message">{errorMessage}</p>}
-  {comments.length === 0 && !errorMessage ? (
-    <p>No comments yet.</p>
-  ) : (
-    <ul>
-      {comments.map((comment: BlogPostComment) => ( // Explicitly type comment in map for clarity
-        <li>
-          <div class="comment-header">
-            <strong>{comment.author}</strong>
-            {/* Ensure timestamp is treated as a string before passing to new Date() */}
-            {comment.timestamp && <span class="comment-timestamp">{new Date(String(comment.timestamp)).toLocaleString()}</span>}
-          </div>
-          <p class="comment-text">{comment.text}</p>
-        </li>
-      ))}
-    </ul>
-  )}
+  <div id="comments-container">
+    {comments.length === 0 && !errorMessage ? (
+      <p id="no-comments-message">No comments yet.</p>
+    ) : (
+      <ul id="comments-list">
+        {comments.map((comment: BlogPostComment) => ( 
+          <li>
+            <div class="comment-header">
+              <strong>{comment.name}</strong> {/* Updated to comment.name */}
+              {comment.timestamp && <span class="comment-timestamp">{new Date(String(comment.timestamp)).toLocaleString()}</span>}
+            </div>
+            <p class="comment-text">{comment.comment}</p> {/* Updated to comment.comment */}
+          </li>
+        ))}
+      </ul>
+    )}
+    {/* This paragraph will be dynamically shown/hidden if comments-list becomes empty/non-empty after initial load */}
+    {comments.length > 0 && <p id="no-comments-message" style="display: none;">No comments yet.</p>}
+  </div>
 </div>
 
 <style>
   /* All styles will be moved to global.css */
 </style>
+
+<script>
+  const commentForm = document.getElementById('comment-form') as HTMLFormElement;
+  const submitButton = commentForm ? commentForm.querySelector('button[type="submit"]') : null;
+  const commentsListUL = document.getElementById('comments-list'); // Might be null if no comments initially
+  const noCommentsMessageP = document.getElementById('no-comments-message');
+
+  function displayComments(newComments: BlogPostComment[]) {
+    let listToUpdate = commentsListUL;
+    
+    // Ensure commentsListUL exists, if not, create it and remove noCommentsMessageP if it's displayed
+    if (!listToUpdate && newComments.length > 0) {
+        const commentsContainer = document.getElementById('comments-container');
+        if (noCommentsMessageP) noCommentsMessageP.style.display = 'none'; // Hide "No comments yet"
+        
+        listToUpdate = document.createElement('ul');
+        listToUpdate.id = 'comments-list';
+        // Apply global styles by ensuring it's part of .comment-section if needed, or just rely on existing global styles
+        if (commentsContainer) commentsContainer.appendChild(listToUpdate);
+    } else if (listToUpdate) {
+        listToUpdate.innerHTML = ''; // Clear existing comments
+    }
+
+
+    if (newComments.length === 0) {
+      if (listToUpdate) listToUpdate.style.display = 'none'; // Hide list if it's empty
+      if (noCommentsMessageP) noCommentsMessageP.style.display = 'block'; // Show "No comments yet"
+      return;
+    } else {
+      if (listToUpdate) listToUpdate.style.display = 'block'; // Ensure list is visible
+      if (noCommentsMessageP) noCommentsMessageP.style.display = 'none'; // Hide "No comments yet"
+    }
+
+    newComments.forEach(comment => {
+      const li = document.createElement('li');
+      
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'comment-header';
+      
+      const strongName = document.createElement('strong');
+      strongName.textContent = comment.name; // Use .name
+      
+      const spanTimestamp = document.createElement('span');
+      spanTimestamp.className = 'comment-timestamp';
+      spanTimestamp.textContent = new Date(String(comment.timestamp)).toLocaleString();
+      
+      headerDiv.appendChild(strongName);
+      if (comment.timestamp) { // Only add timestamp if it exists
+          headerDiv.appendChild(spanTimestamp);
+      }
+      
+      const pText = document.createElement('p');
+      pText.className = 'comment-text';
+      pText.textContent = comment.comment; // Use .comment
+      
+      li.appendChild(headerDiv);
+      li.appendChild(pText);
+      
+      if(listToUpdate) listToUpdate.appendChild(li);
+    });
+  }
+
+  if (commentForm && submitButton) {
+    commentForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      submitButton.setAttribute('disabled', 'true');
+      submitButton.textContent = 'Submitting...';
+
+      const formData = new FormData(commentForm);
+
+      try {
+        const response = await fetch(window.location.pathname, { // POST to current page
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          console.log('Comment submitted successfully!');
+          commentForm.reset();
+          
+          // Fetch updated comments
+          try {
+            const updatedCommentsResponse = await fetch('/comments.json?t=' + Date.now());
+            if (!updatedCommentsResponse.ok) {
+              throw new Error(`Failed to fetch updated comments: ${updatedCommentsResponse.statusText}`);
+            }
+            const updatedComments: BlogPostComment[] = await updatedCommentsResponse.json();
+            displayComments(updatedComments);
+          } catch (fetchError) {
+            console.error('Error fetching or rendering updated comments:', fetchError);
+            alert('Comment submitted, but failed to refresh the comment list. Please reload the page.');
+          }
+
+        } else {
+          console.error('Failed to submit comment. Status:', response.status);
+          const errorText = await response.text();
+          console.error('Server error response:', errorText);
+          alert(`Error submitting comment: ${response.statusText}. ${errorText ? 'Details: ' + errorText : ''}`);
+        }
+      } catch (error) {
+        console.error('Network error or other issue submitting comment:', error);
+        alert('An error occurred while submitting your comment. Please try again.');
+      } finally {
+        submitButton.removeAttribute('disabled');
+        submitButton.textContent = 'Submit Comment';
+      }
+    });
+  } else {
+    console.error('Comment form or submit button not found.');
+  }
+</script>
