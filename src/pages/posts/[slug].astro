@@ -1,7 +1,7 @@
 ---
 import { getCollection, type CollectionEntry } from "astro:content";
-import fs from 'node:fs/promises';
-import path from 'node:path';
+// import fs from 'node:fs/promises'; // Removed
+// import path from 'node:path'; // Removed
 import Layout from "../../components/layout.astro";
 import Tag from "../../components/tag.astro";
 
@@ -24,71 +24,8 @@ type Props = {
 
 const { post } = Astro.props;
 
-if (Astro.request.method === "POST") {
-  try {
-    const formData = await Astro.request.formData();
-    const name = formData.get("name")?.toString(); // Already "name"
-    const comment = formData.get("comment")?.toString(); // Changed from commentText
-
-    if (!name || !comment) { // Updated variable name here
-      //throw new Error("Name and comment fields are required."); // Old error throwing
-      return new Response(JSON.stringify({ success: false, message: "Name and comment fields are required." }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const newComment: BlogPostComment = { // Explicitly type newComment
-      name: name,         // Changed from author to name
-      comment: comment,   // Changed from text to comment
-      timestamp: new Date().toLocaleString('sv-SE'), // YYYY-MM-DD HH:mm:ss format
-    };
-
-    const commentsFilePath = path.join(process.cwd(), 'public', 'comments.json');
-    let comments: BlogPostComment[] = []; // Explicitly type comments array
-    try {
-      const fileContent = await fs.readFile(commentsFilePath, 'utf-8');
-      // Parse and assert type. For robustness, consider validation logic here.
-      const parsedData = JSON.parse(fileContent); 
-      if (Array.isArray(parsedData)) {
-        // A further check could be to validate each item in parsedData conforms to BlogPostComment interface
-        comments = parsedData as BlogPostComment[];
-      } else {
-        console.error("Warning: comments.json did not contain an array. Initializing with new comment.");
-        comments = []; // Ensure it's BlogPostComment[]
-      }
-    } catch (readError: any) {
-      if (readError.code === 'ENOENT') {
-        console.log("comments.json not found, creating a new one.");
-        // File doesn't exist, it will be created with the new comment. `comments` is already `[]`.
-      } else {
-        // For other read errors, log and proceed with an empty comments array or rethrow
-        console.error("Error reading comments.json:", readError);
-        // Depending on desired behavior, could rethrow or ensure comments = []
-        comments = []; // Default to empty array on other read errors
-      }
-    }
-
-    comments.push(newComment); // newComment is already typed as BlogPostComment
-    await fs.writeFile(commentsFilePath, JSON.stringify(comments, null, 2), 'utf-8');
-
-    // It's important to redirect to prevent form resubmission on refresh -- no longer redirecting
-    // Astro.url.pathname will give the current page's path
-    // return Astro.redirect(Astro.url.pathname, 303); // 303 See Other for POST-redirect-GET pattern - REMOVED
-    return new Response(JSON.stringify({ success: true, message: "Comment submitted successfully.", comment: newComment }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error: any) {
-    console.error("Error processing comment submission:", error);
-    // Optionally, render the page with an error message instead of just logging - Now returning JSON
-    // To pass error to the page: Astro.locals.error = error.message; (and handle in template) - Not applicable for API style response
-    return new Response(JSON.stringify({ success: false, message: error.message || "Internal server error processing comment." }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
+// The entire if (Astro.request.method === "POST") block has been removed.
+// Comments are now handled client-side with localStorage.
 ---
 
 <Layout title={post.data.title} description={post.data.description}>
@@ -110,7 +47,7 @@ if (Astro.request.method === "POST") {
   <div class="relative flex flex-col gap-2 max-w-screen-md mx-auto px-4 sm:px-6 text-base text-zinc-700">
     <PostContent post={post} />
   </div>
-  <CommentSection />
+  <CommentSection postSlug={post.slug} />
 </Layout>
 
 <script>
