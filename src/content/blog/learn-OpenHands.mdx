@@ -307,7 +307,7 @@ OpenHands 的核心交互流程是通过一系列的 `Event` 对象来记录和�
     *   `content: str`: 文件的内容。
 *   **`FileWriteObservation(observation=ObservationType.WRITE)` / `FileEditObservation(observation=ObservationType.EDIT)`**: 文件写入/编辑操作的结果。
     *   `path: str`: 被操作的文件的路径。
-    *   `content: str`: 通常是一个确认消息，如 "File written successfully" 或 "Error writing file: <reason>"。
+    *   `content: str`: 通常是一个确认消息，如 "File written successfully" 或 "Error writing file: reason"。
 *   **`ErrorObservation(observation=ObservationType.ERROR)`**: 表示在尝试执行动作或在 Agent 运行过程中发生了可恢复的错误。
     *   `content: str`: 详细的错误信息。
     *   `error_id: str` (或 `error_type: str`): 错误的分类。
