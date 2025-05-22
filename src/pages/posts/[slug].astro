@@ -34,31 +34,38 @@ if (Astro.request.method === "POST") {
       throw new Error("Name and comment fields are required.");
     }
 
-    const newComment = {
+    const newComment: Comment = { // Explicitly type newComment
       author: name,
       text: commentText,
       timestamp: new Date().toLocaleString('sv-SE'), // YYYY-MM-DD HH:mm:ss format
     };
 
     const commentsFilePath = path.join(process.cwd(), 'public', 'comments.json');
-    let comments = [];
+    let comments: Comment[] = []; // Explicitly type comments array
     try {
       const fileContent = await fs.readFile(commentsFilePath, 'utf-8');
-      comments = JSON.parse(fileContent);
-      if (!Array.isArray(comments)) {
+      // Parse and assert type. For robustness, consider validation logic here.
+      const parsedData = JSON.parse(fileContent); 
+      if (Array.isArray(parsedData)) {
+        // A further check could be to validate each item in parsedData conforms to Comment interface
+        comments = parsedData as Comment[];
+      } else {
         console.error("Warning: comments.json did not contain an array. Initializing with new comment.");
-        comments = [];
+        comments = []; // Ensure it's Comment[]
       }
     } catch (readError: any) {
       if (readError.code === 'ENOENT') {
         console.log("comments.json not found, creating a new one.");
-        // File doesn't exist, will be created with the new comment
+        // File doesn't exist, it will be created with the new comment. `comments` is already `[]`.
       } else {
-        throw readError; // Re-throw other read errors
+        // For other read errors, log and proceed with an empty comments array or rethrow
+        console.error("Error reading comments.json:", readError);
+        // Depending on desired behavior, could rethrow or ensure comments = []
+        comments = []; // Default to empty array on other read errors
       }
     }
 
-    comments.push(newComment);
+    comments.push(newComment); // newComment is already typed as Comment
     await fs.writeFile(commentsFilePath, JSON.stringify(comments, null, 2), 'utf-8');
 
     // It's important to redirect to prevent form resubmission on refresh

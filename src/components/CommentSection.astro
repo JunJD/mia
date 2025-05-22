@@ -1,34 +1,38 @@
 ---
 // src/components/CommentSection.astro
-let comments = [];
+// The Comment interface is globally available from src/types/env.d.ts
+let comments: Comment[] = [];
 let errorMessage = '';
 
 try {
   const response = await fetch('/comments.json');
   if (response.ok) {
-    const data = await response.json();
+    // Assume the json is an array of Comment objects.
+    // Add type assertion for stronger type checking.
+    const data = await response.json() as Comment[]; 
     if (Array.isArray(data)) {
+      // Further check if elements are actual comments if necessary, for now, trust the source or structure.
+      // A more robust check might involve validating each object in the array.
       comments = data;
     } else {
-      console.error("Error: comments.json is not an array");
-      errorMessage = 'Error loading comments.';
-      comments = []; // Ensure comments is an array
+      console.error("Error: comments.json is not an array or is malformed.");
+      errorMessage = 'Error loading comments. Data format incorrect.';
+      comments = []; // Ensure comments is Comment[]
     }
   } else {
     if (response.status === 404) {
       // comments.json doesn't exist, treat as no comments yet.
-      // This can happen if the file hasn't been created or is not found.
       comments = []; 
     } else {
       console.error(`Error fetching comments: ${response.status} ${response.statusText}`);
       errorMessage = 'Error loading comments.';
-      comments = []; // Ensure comments is an array
+      comments = []; // Ensure comments is Comment[]
     }
   }
 } catch (error) {
   console.error('Failed to fetch or parse comments.json:', error);
   errorMessage = 'Could not load comments at this time.';
-  comments = []; // Ensure comments is an array in case of any error
+  comments = []; // Ensure comments is Comment[] in case of any error
 }
 ---
 
@@ -52,11 +56,12 @@ try {
     <p>No comments yet.</p>
   ) : (
     <ul>
-      {comments.map(comment => (
+      {comments.map((comment: Comment) => ( // Explicitly type comment in map for clarity
         <li>
           <div class="comment-header">
             <strong>{comment.author}</strong>
-            {comment.timestamp && <span class="comment-timestamp">{new Date(comment.timestamp).toLocaleString()}</span>}
+            {/* Ensure timestamp is treated as a string before passing to new Date() */}
+            {comment.timestamp && <span class="comment-timestamp">{new Date(String(comment.timestamp)).toLocaleString()}</span>}
           </div>
           <p class="comment-text">{comment.text}</p>
         </li>
