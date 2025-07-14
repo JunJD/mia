@@ -1,7 +1,7 @@
 ---
 import { getCollection, type CollectionEntry } from "astro:content";
-import fs from 'node:fs/promises';
-import path from 'node:path';
+// import fs from 'node:fs/promises'; // Removed
+// import path from 'node:path'; // Removed
 import Layout from "../../components/layout.astro";
 import Tag from "../../components/tag.astro";
 
@@ -24,53 +24,8 @@ type Props = {
 
 const { post } = Astro.props;
 
-if (Astro.request.method === "POST") {
-  try {
-    const formData = await Astro.request.formData();
-    const name = formData.get("name")?.toString();
-    const commentText = formData.get("comment")?.toString();
-
-    if (!name || !commentText) {
-      throw new Error("Name and comment fields are required.");
-    }
-
-    const newComment = {
-      author: name,
-      text: commentText,
-      timestamp: new Date().toLocaleString('sv-SE'), // YYYY-MM-DD HH:mm:ss format
-    };
-
-    const commentsFilePath = path.join(process.cwd(), 'public', 'comments.json');
-    let comments = [];
-    try {
-      const fileContent = await fs.readFile(commentsFilePath, 'utf-8');
-      comments = JSON.parse(fileContent);
-      if (!Array.isArray(comments)) {
-        console.error("Warning: comments.json did not contain an array. Initializing with new comment.");
-        comments = [];
-      }
-    } catch (readError: any) {
-      if (readError.code === 'ENOENT') {
-        console.log("comments.json not found, creating a new one.");
-        // File doesn't exist, will be created with the new comment
-      } else {
-        throw readError; // Re-throw other read errors
-      }
-    }
-
-    comments.push(newComment);
-    await fs.writeFile(commentsFilePath, JSON.stringify(comments, null, 2), 'utf-8');
-
-    // It's important to redirect to prevent form resubmission on refresh
-    // Astro.url.pathname will give the current page's path
-    return Astro.redirect(Astro.url.pathname, 303); // 303 See Other for POST-redirect-GET pattern
-  } catch (error: any) {
-    console.error("Error processing comment submission:", error);
-    // Optionally, render the page with an error message instead of just logging
-    // For now, let's just proceed to render the page, error will be in logs
-    // To pass error to the page: Astro.locals.error = error.message; (and handle in template)
-  }
-}
+// The entire if (Astro.request.method === "POST") block has been removed.
+// Comments are now handled client-side with localStorage.
 ---
 
 <Layout title={post.data.title} description={post.data.description}>
@@ -92,7 +47,7 @@ if (Astro.request.method === "POST") {
   <div class="relative flex flex-col gap-2 max-w-screen-md mx-auto px-4 sm:px-6 text-base text-zinc-700">
     <PostContent post={post} />
   </div>
-  <CommentSection />
+  <CommentSection postSlug={post.slug} />
 </Layout>
 
 <script>

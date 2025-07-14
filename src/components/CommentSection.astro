@@ -1,40 +1,21 @@
 ---
 // src/components/CommentSection.astro
-let comments = [];
-let errorMessage = '';
+// The BlogPostComment interface is globally available from src/types/env.d.ts
 
-try {
-  const response = await fetch('/comments.json');
-  if (response.ok) {
-    const data = await response.json();
-    if (Array.isArray(data)) {
-      comments = data;
-    } else {
-      console.error("Error: comments.json is not an array");
-      errorMessage = 'Error loading comments.';
-      comments = []; // Ensure comments is an array
-    }
-  } else {
-    if (response.status === 404) {
-      // comments.json doesn't exist, treat as no comments yet.
-      // This can happen if the file hasn't been created or is not found.
-      comments = []; 
-    } else {
-      console.error(`Error fetching comments: ${response.status} ${response.statusText}`);
-      errorMessage = 'Error loading comments.';
-      comments = []; // Ensure comments is an array
-    }
-  }
-} catch (error) {
-  console.error('Failed to fetch or parse comments.json:', error);
-  errorMessage = 'Could not load comments at this time.';
-  comments = []; // Ensure comments is an array in case of any error
+// Props type definition
+export interface Props {
+  postSlug: string; // To be passed from the parent page e.g., [slug].astro
 }
+const { postSlug } = Astro.props;
+
+// Remove server-side fetching of comments.json; this will now be client-side from localStorage.
+// let comments: BlogPostComment[] = []; // No longer needed for SSR of comments list
+// let errorMessage = ''; // Error messages can be handled client-side if needed for localStorage
 ---
 
-<div class="comment-section">
+<div class="comment-section" data-post-slug={postSlug}>
   <h3>Leave a Comment</h3>
-  <form method="POST">
+  <form method="POST" id="comment-form">
     <div>
       <label for="name">Name:</label>
       <input type="text" id="name" name="name" required />
@@ -47,24 +28,137 @@ try {
   </form>
 
   <h3>Comments</h3>
-  {errorMessage && <p class="error-message">{errorMessage}</p>}
-  {comments.length === 0 && !errorMessage ? (
-    <p>No comments yet.</p>
-  ) : (
-    <ul>
-      {comments.map(comment => (
-        <li>
-          <div class="comment-header">
-            <strong>{comment.author}</strong>
-            {comment.timestamp && <span class="comment-timestamp">{new Date(comment.timestamp).toLocaleString()}</span>}
-          </div>
-          <p class="comment-text">{comment.text}</p>
-        </li>
-      ))}
-    </ul>
-  )}
+  {/* errorMessage can be dynamically set by client-side script if needed */}
+  <div id="comments-container">
+    {/* Initial state will be "No comments yet" or an empty list, to be populated by client-side script */}
+    <p id="no-comments-message">Loading comments...</p> 
+    <ul id="comments-list" style="display: none;"></ul>
+  </div>
 </div>
 
 <style>
   /* All styles will be moved to global.css */
 </style>
+
+<script>
+  const commentSectionDiv = document.querySelector('.comment-section') as HTMLElement;
+  const currentPostSlug = commentSectionDiv ? commentSectionDiv.dataset.postSlug : null;
+  
+  const commentForm = document.getElementById('comment-form') as HTMLFormElement;
+  const submitButton = commentForm ? commentForm.querySelector('button[type="submit"]') : null;
+  const commentsListUL = document.getElementById('comments-list') as HTMLUListElement;
+  const noCommentsMessageP = document.getElementById('no-comments-message') as HTMLParagraphElement;
+
+  function displayComments(commentsToDisplay: BlogPostComment[]) {
+    if (!commentsListUL || !noCommentsMessageP) {
+        console.error('Comments list or no-comments message element not found.');
+        return;
+    }
+    commentsListUL.innerHTML = ''; // Clear existing comments
+
+    if (commentsToDisplay.length === 0) {
+      commentsListUL.style.display = 'none';
+      noCommentsMessageP.style.display = 'block';
+      noCommentsMessageP.textContent = 'No comments yet.';
+    } else {
+      commentsListUL.style.display = 'block';
+      noCommentsMessageP.style.display = 'none';
+      commentsToDisplay.forEach(comment => {
+        const li = document.createElement('li');
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'comment-header';
+        
+        const strongName = document.createElement('strong');
+        strongName.textContent = comment.name;
+        
+        const spanTimestamp = document.createElement('span');
+        spanTimestamp.className = 'comment-timestamp';
+        // Ensure timestamp is a valid date string for Date constructor
+        spanTimestamp.textContent = new Date(comment.timestamp).toLocaleString(); 
+        
+        headerDiv.appendChild(strongName);
+        headerDiv.appendChild(spanTimestamp);
+        
+        const pText = document.createElement('p');
+        pText.className = 'comment-text';
+        pText.textContent = comment.comment;
+        
+        li.appendChild(headerDiv);
+        li.appendChild(pText);
+        commentsListUL.appendChild(li);
+      });
+    }
+  }
+
+  function loadCommentsFromLocalStorage() {
+    if (!currentPostSlug) {
+      console.error('Post slug not found. Cannot load comments.');
+      if (noCommentsMessageP) noCommentsMessageP.textContent = 'Error: Could not determine post context for comments.';
+      return;
+    }
+    const storageKey = `comments_${currentPostSlug}`;
+    let comments: BlogPostComment[] = [];
+    try {
+        comments = JSON.parse(localStorage.getItem(storageKey) || '[]') as BlogPostComment[];
+    } catch (e) {
+        console.error('Error parsing comments from localStorage:', e);
+        comments = []; // Default to empty array on parsing error
+    }
+    displayComments(comments);
+  }
+
+  if (commentForm && submitButton && currentPostSlug) {
+    commentForm.addEventListener('submit', (event) => { // Removed async as fetch is removed
+      event.preventDefault();
+      submitButton.setAttribute('disabled', 'true');
+      submitButton.textContent = 'Submitting...';
+
+      const formData = new FormData(commentForm);
+      const name = formData.get('name')?.toString().trim();
+      const comment = formData.get('comment')?.toString().trim();
+
+      if (!name || !comment) {
+        alert('Name and comment fields cannot be empty.');
+        submitButton.removeAttribute('disabled');
+        submitButton.textContent = 'Submit Comment';
+        return;
+      }
+
+      const newComment: BlogPostComment = {
+        name: name,
+        comment: comment,
+        timestamp: new Date().toISOString(), // Standardized timestamp
+      };
+      
+      const storageKey = `comments_${currentPostSlug}`;
+      let currentComments: BlogPostComment[] = [];
+      try {
+        currentComments = JSON.parse(localStorage.getItem(storageKey) || '[]') as BlogPostComment[];
+      } catch (e) {
+        console.error('Error parsing comments from localStorage before saving:', e);
+        // Decide if we should proceed or not. For now, proceed with empty array.
+        currentComments = [];
+      }
+      
+      currentComments.push(newComment);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(currentComments));
+        displayComments(currentComments); // Update UI with the new list
+        commentForm.reset();
+      } catch (e) {
+        console.error('Error saving comments to localStorage:', e);
+        alert('Failed to save comment. Your browser might be out of storage space.');
+      } finally {
+        submitButton.removeAttribute('disabled');
+        submitButton.textContent = 'Submit Comment';
+      }
+    });
+  } else {
+    if (!currentPostSlug) console.error('Comment section post slug not found.');
+    if (!commentForm) console.error('Comment form not found.');
+    if (!submitButton) console.error('Submit button not found.');
+  }
+
+  // Initial load of comments from localStorage when the script runs
+  loadCommentsFromLocalStorage();
+</script>
