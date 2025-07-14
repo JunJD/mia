@@ -8,7 +8,7 @@ import remarkMath from "remark-math";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://astro-theme-mia.pages.dev",
+  site: "https://blog.dingjunjie.com",
   trailingSlash: "never",
   prefetch: {
     prefetchAll: true,
